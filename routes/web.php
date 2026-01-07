@@ -31,3 +31,8 @@ Route::get('/login-admin', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
+
+Route::get('/health', function () {
+  return response()->json(['status' => 'ok']);
+});
+
