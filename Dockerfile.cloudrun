@@ -1,0 +1,50 @@
+# =========================
+# 1) Vendor stage
+# =========================
+FROM composer:2 AS vendor
+WORKDIR /app
+
+# caching: copy composer files dulu
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
+
+# lalu copy source code (tanpa vendor karena sudah di .dockerignore)
+COPY . .
+RUN composer dump-autoload -o --no-dev
+
+# =========================
+# 2) Runtime stage
+# =========================
+FROM php:8.2-fpm-alpine
+
+RUN apk add --no-cache nginx supervisor bash \
+    icu-libs oniguruma libzip \
+ && apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev \
+ && docker-php-ext-install pdo_mysql mbstring intl zip \
+ && apk del .build-deps
+
+WORKDIR /var/www/html
+
+COPY . .
+COPY --from=vendor /app/vendor ./vendor
+
+# hapus cache yang bisa nyangkut ke dev packages (mis. laravel/pail)
+RUN rm -f bootstrap/cache/*.php
+
+COPY docker/cloudrun/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/cloudrun/supervisord.conf /etc/supervisord.conf
+COPY docker/cloudrun/php.ini /usr/local/etc/php/conf.d/99-cloudrun.ini
+
+RUN mkdir -p \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/framework/sessions \
+    storage/logs \
+    bootstrap/cache \
+    storage/app/public \
+ && chmod -R 775 storage bootstrap/cache \
+ && ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
+
+EXPOSE 8080
+CMD ["/usr/bin/supervisord","-c","/etc/supervisord.conf"]
