@@ -6,6 +6,8 @@ use App\Models\Beritaartikel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
 
 class BeritaartikelController extends Controller
 {
@@ -15,6 +17,13 @@ class BeritaartikelController extends Controller
     public function index()
     {
         $data = Beritaartikel::latest()->get();
+
+        // Format tanggal sebelum dikirim ke response
+        $data->transform(function ($item) {
+            $item->tanggal = \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y'); // contoh: 12 Januari 2026
+            return $item;
+        });
+    
         return response()->json($data);
     }
 
